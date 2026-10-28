@@ -29,4 +29,4 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 
 | Area | Introduced |
 |------|------------|
-| *(none yet)* | Add rows as features merge to `dev` |
+| Register, login, logout; `users` / `sessions`; session rules | Feature 1 |
