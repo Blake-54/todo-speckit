@@ -1,7 +1,7 @@
 # API Reference
 
 **Base path:** `/todo/`  
-**Status:** Integrated API through **Feature 1** (authentication).  
+**Status:** Integrated API through **Feature 2** (todo list management).  
 **Authority for new work:** feature specs in `features/` — update this file in the same PR when routes or payloads change.
 
 **Auth:** Send `Authorization: Bearer <token>` on protected routes.  
@@ -12,7 +12,7 @@
 | Area | Feature |
 |------|---------|
 | Register, login, logout | 1 |
-| Authenticated `GET /todo/lists` (empty array until list persistence) | 1 |
+| List CRUD | 2 |
 
 ---
 
@@ -69,12 +69,36 @@ Password hashes are never included in API responses.
 
 ---
 
-## Lists (Feature 1 foundation)
+## Lists (Feature 2)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| `GET` | `/todo/lists` | Yes | Lists owned by the caller |
+| `GET` | `/todo/lists` | Yes | Lists owned by the caller, alphabetical by name |
+| `POST` | `/todo/lists` | Yes | Create a list owned by the caller |
+| `PUT` | `/todo/lists/:listId` | Yes | Rename a list owned by the caller |
+| `DELETE` | `/todo/lists/:listId` | Yes | Delete a list owned by the caller |
 
-**Success (`200`):** JSON array. List CRUD and persistence ship in Feature 2; this endpoint currently returns `[]` scoped to the authenticated user.
+**Create / rename body:**
+```json
+{ "name": "Groceries" }
+```
 
-**Unauthenticated:** `401`.
+`userId` in the body is ignored. The saved owner is always the authenticated user.
+
+**List object** (`201` create · `200` rename · each `GET` element):
+```json
+{
+  "id": 1,
+  "name": "Groceries",
+  "userId": 42,
+  "createdAt": "2026-07-02T12:00:00.000Z",
+  "updatedAt": "2026-07-02T12:00:00.000Z"
+}
+```
+
+**Delete success** (`200`):
+```json
+{ "message": "List deleted." }
+```
+
+**List errors:** empty or whitespace-only name `400` (`"List name is required."`); name longer than 100 characters `400` (`"List name must be 100 characters or fewer."`); invalid `listId` `400` (`"Invalid list id."`); missing or unowned list `404` (`"List with id=<id> not found."`); missing or invalid token `401`.

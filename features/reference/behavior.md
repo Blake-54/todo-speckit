@@ -41,14 +41,22 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Rule | Enforcement | Introduced |
 |------|-------------|------------|
 | Every authenticated request resolves to `req.user.id` from the session | `authenticate` | Feature 1 |
-| `GET /todo/lists` returns only the caller's lists | Authenticated list read | Feature 1 |
+| `GET /todo/lists` returns only the caller's lists, ordered alphabetically by name | List read | Feature 2 |
+| Create sets `userId` from the session; a `userId` in the body is ignored | List create | Feature 2 |
+| Rename and delete apply only when `id` and `userId` both match; cross-user access is `404` | `getAccessibleListOrNull` | Feature 2 |
+| A list's owner never changes after create | List update writes `name` only | Feature 2 |
+| List names are trimmed; empty or whitespace-only names are rejected | List create/rename + dashboard form | Feature 2 |
+| List names longer than 100 characters are rejected | List create/rename | Feature 2 |
 
-## UI (Feature 1)
+## UI
 
 | Rule | Enforcement | Introduced |
 |------|-------------|------------|
 | Login and register are full-screen auth layouts (no `MenuBar`) | `App.vue` + Login/Register views | Feature 1 |
-| Protected home is a placeholder with a welcome using first name and a **Sign out** button | `Home.vue` | Feature 1 |
+| Signed-in home is one lists view: heading **My Lists**, **+ New List**, and edit/delete dialogs on each row | `Dashboard.vue` | Feature 2 |
+| Empty lists copy is **No lists yet. Create your first list.** | `Dashboard.vue` | Feature 2 |
+| List API failures use `<v-alert type="error">` | `Dashboard.vue` | Feature 2 |
+| `MenuBar` shows the signed-in user's name and **Sign out**, and is hidden on login and register | `MenuBar.vue` + `App.vue` | Feature 2 |
 | Session stored in `localStorage` key `user` | `Utils.setStore` after login/register | Feature 1 |
 | Auth form errors via `<v-alert type="error">`; client validation blocks empty/invalid submit | Login/Register views | Feature 1 |
 
@@ -58,6 +66,8 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 |------|-------------|------------|
 | Error body shape `{ "message": "Human-readable explanation." }` | Controllers | Feature 1 |
 | Missing/invalid session on protected routes uses `401` | `authenticate` | Feature 1 |
+| Unowned or missing list uses `404` with `"List with id=<id> not found."` | List update/delete | Feature 2 |
+| Invalid list id uses `400` with `"Invalid list id."` | List update/delete | Feature 2 |
 
 ---
 
