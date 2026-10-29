@@ -1,6 +1,6 @@
 # Data Model Reference
 
-**Status:** Integrated schema through **Feature 4** (`users`, `sessions`, `lists`, `todos`). Feature 4 adds no tables or columns; it reads and updates `users`.  
+**Status:** Integrated schema through **Feature 5** (`users`, `sessions`, `lists`, `todos` with optional `dueDate`).  
 **Authority for new work:** feature specs in `features/` — update this file in the same PR when schema changes.  
 **Architecture:** [ADR-0003 — MySQL relational database](../../docs/adr/0003-mysql-relational-database.md)
 
@@ -12,6 +12,7 @@
 | `lists` | Feature 2 |
 | `todos` | Feature 3 |
 | Profile read/update of existing `users` columns | Feature 4 |
+| `todos.dueDate` | Feature 5 |
 
 ---
 
@@ -67,6 +68,7 @@
 | `listId` | INTEGER FK | Required → `lists.id`; deleting a list deletes its todos (`onDelete: CASCADE`) |
 | `title` | STRING(255) | Required; trimmed; max 255 characters |
 | `completed` | BOOLEAN | Required; default `false` |
+| `dueDate` | DATEONLY | Nullable; optional on create and update. `null` means no due date. Cleared by `PUT` with `dueDate: null`; omitted `dueDate` leaves the stored value |
 | `userId` | INTEGER FK | Required → `users.id`; set from the authenticated user on create |
 | `createdAt` | DATE | Sequelize timestamps |
 | `updatedAt` | DATE | Sequelize timestamps |

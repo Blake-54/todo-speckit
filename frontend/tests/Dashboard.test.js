@@ -4,6 +4,9 @@
  *
  * Feature 3 — Todo List Item Management
  * Spec: features/feature-3-todo-list-item-management.md
+ *
+ * Feature 5 — Todo Due Date
+ * Spec: features/feature-5-todo-due-date.md
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -11,6 +14,7 @@ import { flushPromises } from "@vue/test-utils";
 import Dashboard from "../src/views/Dashboard.vue";
 import todoServices from "../src/services/todoServices.js";
 import appRouter from "../src/router.js";
+import { formatDueDate } from "../src/config/validation.js";
 import { mountWithPlugins } from "./testUtils.js";
 
 vi.mock("../src/services/todoServices.js", () => ({
@@ -640,6 +644,180 @@ describe("Feature 3 — Todo List Item Management", () => {
       });
       expect(findTodoRow(wrapper, "Buy milk")).toBeFalsy();
       expect(itemsDialog(wrapper).text()).toContain("No todos in this list yet.");
+    });
+  });
+});
+
+function localIsoDate(offsetDays) {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function textFields(wrapper) {
+  return wrapper.findAllComponents({ name: "VTextField" });
+}
+
+describe("Feature 5 — Todo Due Date", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  describe("US-5.1 — Set a due date when creating a todo", () => {
+    it("User adds a todo with a due date", async () => {
+      const withDate = {
+        ...buyMilk,
+        dueDate: "2026-07-15",
+      };
+      todoServices.getLists.mockResolvedValue({ data: [groceries] });
+      todoServices.getTodos
+        .mockResolvedValueOnce({ data: [] })
+        .mockResolvedValueOnce({ data: [withDate] });
+      todoServices.createTodo.mockResolvedValue({ status: 201, data: withDate });
+
+      const wrapper = await mountDashboard();
+      await openItems(wrapper, "Groceries");
+      await clickButton(wrapper, "+ Add Item");
+
+      const fields = textFields(wrapper);
+      await fields[0].setValue("Buy milk");
+      await fields[1].setValue("2026-07-15");
+      await wrapper.findComponent({ name: "VForm" }).trigger("submit");
+      await flushPromises();
+
+      expect(todoServices.createTodo).toHaveBeenCalledWith(groceries.id, {
+        title: "Buy milk",
+        dueDate: "2026-07-15",
+      });
+      await expect(todoServices.createTodo.mock.results[0].value).resolves.toMatchObject({
+        status: 201,
+        data: { dueDate: "2026-07-15" },
+      });
+
+      const row = findTodoRow(wrapper, "Buy milk");
+      expect(row.text()).toContain(formatDueDate("2026-07-15"));
+    });
+  });
+
+  describe("US-5.3 — Edit or clear a due date", () => {
+    it("User sets a due date when editing a todo", async () => {
+      const updated = {
+        ...buyMilk,
+        dueDate: "2026-07-20",
+      };
+      todoServices.getLists.mockResolvedValue({ data: [groceries] });
+      todoServices.getTodos
+        .mockResolvedValueOnce({ data: [buyMilk] })
+        .mockResolvedValueOnce({ data: [updated] });
+      todoServices.updateTodo.mockResolvedValue({ status: 200, data: updated });
+
+      const wrapper = await mountDashboard();
+      await openItems(wrapper, "Groceries");
+
+      const row = findTodoRow(wrapper, "Buy milk");
+      await findRowButton(row, "Edit Buy milk").trigger("click");
+      await flushPromises();
+
+      const fields = textFields(wrapper);
+      expect(fields[0].props("modelValue")).toBe("Buy milk");
+      expect(fields[1].props("modelValue")).toBe("");
+
+      await fields[1].setValue("2026-07-20");
+      await wrapper.findComponent({ name: "VForm" }).trigger("submit");
+      await flushPromises();
+
+      expect(todoServices.updateTodo).toHaveBeenCalledWith(buyMilk.id, {
+        title: "Buy milk",
+        dueDate: "2026-07-20",
+      });
+      await expect(todoServices.updateTodo.mock.results[0].value).resolves.toMatchObject({
+        status: 200,
+        data: { dueDate: "2026-07-20" },
+      });
+      expect(findTodoRow(wrapper, "Buy milk").text()).toContain(formatDueDate("2026-07-20"));
+    });
+
+    it("User clears a due date when editing a todo", async () => {
+      const withDate = {
+        ...buyMilk,
+        dueDate: "2026-07-20",
+      };
+      const cleared = {
+        ...buyMilk,
+        dueDate: null,
+      };
+      todoServices.getLists.mockResolvedValue({ data: [groceries] });
+      todoServices.getTodos
+        .mockResolvedValueOnce({ data: [withDate] })
+        .mockResolvedValueOnce({ data: [cleared] });
+      todoServices.updateTodo.mockResolvedValue({ status: 200, data: cleared });
+
+      const wrapper = await mountDashboard();
+      await openItems(wrapper, "Groceries");
+
+      const row = findTodoRow(wrapper, "Buy milk");
+      expect(row.text()).toContain(formatDueDate("2026-07-20"));
+      await findRowButton(row, "Edit Buy milk").trigger("click");
+      await flushPromises();
+
+      const fields = textFields(wrapper);
+      expect(fields[1].props("modelValue")).toBe("2026-07-20");
+      await fields[1].setValue("");
+      await wrapper.findComponent({ name: "VForm" }).trigger("submit");
+      await flushPromises();
+
+      expect(todoServices.updateTodo).toHaveBeenCalledWith(buyMilk.id, {
+        title: "Buy milk",
+        dueDate: null,
+      });
+      await expect(todoServices.updateTodo.mock.results[0].value).resolves.toMatchObject({
+        status: 200,
+        data: { dueDate: null },
+      });
+      expect(findTodoRow(wrapper, "Buy milk").text()).not.toContain(formatDueDate("2026-07-20"));
+    });
+  });
+
+  describe("US-5.4 — Spot overdue todos", () => {
+    it("Incomplete todo past due date is styled as overdue", async () => {
+      const dueDate = localIsoDate(-1);
+      const overdue = {
+        ...buyMilk,
+        dueDate,
+        completed: false,
+      };
+      todoServices.getLists.mockResolvedValue({ data: [groceries] });
+      todoServices.getTodos.mockResolvedValue({ data: [overdue] });
+
+      const wrapper = await mountDashboard();
+      await openItems(wrapper, "Groceries");
+
+      const row = findTodoRow(wrapper, "Buy milk");
+      expect(row.text()).toContain(formatDueDate(dueDate));
+      expect(row.find(".text-error").exists()).toBe(true);
+    });
+
+    it("Completed todo past due date is not styled as overdue", async () => {
+      const dueDate = localIsoDate(-1);
+      const done = {
+        ...buyMilk,
+        dueDate,
+        completed: true,
+      };
+      todoServices.getLists.mockResolvedValue({ data: [groceries] });
+      todoServices.getTodos.mockResolvedValue({ data: [done] });
+
+      const wrapper = await mountDashboard();
+      await openItems(wrapper, "Groceries");
+
+      const row = findTodoRow(wrapper, "Buy milk");
+      expect(row.text()).toContain(formatDueDate(dueDate));
+      expect(row.find(".text-error").exists()).toBe(false);
     });
   });
 });

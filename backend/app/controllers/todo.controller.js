@@ -6,6 +6,8 @@ import {
 } from "../authorization/authorization.js";
 
 const TITLE_MAX_LENGTH = 255;
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DUE_DATE_MESSAGE = "Due date must be a valid date in YYYY-MM-DD format.";
 
 const todoTitleError = (title) => {
   if (typeof title !== "string" || !title.trim()) {
@@ -14,6 +16,29 @@ const todoTitleError = (title) => {
 
   if (title.trim().length > TITLE_MAX_LENGTH) {
     return "Todo title must be 255 characters or fewer.";
+  }
+
+  return null;
+};
+
+const dueDateError = (value) => {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string" || !DATE_ONLY_REGEX.test(value)) {
+    return DUE_DATE_MESSAGE;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const valid =
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day;
+
+  if (!valid) {
+    return DUE_DATE_MESSAGE;
   }
 
   return null;
@@ -87,11 +112,20 @@ exports.create = async (req, res) => {
       return res.status(400).send({ message: titleError });
     }
 
+    const hasDueDate = Object.prototype.hasOwnProperty.call(req.body ?? {}, "dueDate");
+    if (hasDueDate) {
+      const dateError = dueDateError(req.body.dueDate);
+      if (dateError) {
+        return res.status(400).send({ message: dateError });
+      }
+    }
+
     const todo = await db.todo.create({
       title: req.body.title.trim(),
       listId,
       userId: req.user.id,
       completed: false,
+      dueDate: hasDueDate ? req.body.dueDate : null,
     });
 
     return res.status(201).send(todo);
@@ -110,8 +144,9 @@ exports.update = async (req, res) => {
   const body = req.body ?? {};
   const hasTitle = Object.prototype.hasOwnProperty.call(body, "title");
   const hasCompleted = Object.prototype.hasOwnProperty.call(body, "completed");
+  const hasDueDate = Object.prototype.hasOwnProperty.call(body, "dueDate");
 
-  if (!hasTitle && !hasCompleted) {
+  if (!hasTitle && !hasCompleted && !hasDueDate) {
     return res.status(400).send({
       message: "Todo title or completed status is required.",
     });
@@ -128,6 +163,13 @@ exports.update = async (req, res) => {
     return res.status(400).send({ message: "Completed must be true or false." });
   }
 
+  if (hasDueDate) {
+    const dateError = dueDateError(body.dueDate);
+    if (dateError) {
+      return res.status(400).send({ message: dateError });
+    }
+  }
+
   try {
     const existing = await getAccessibleTodoOrNull(req, todoId);
     if (!existing) {
@@ -140,6 +182,9 @@ exports.update = async (req, res) => {
     }
     if (hasCompleted) {
       updates.completed = body.completed;
+    }
+    if (hasDueDate) {
+      updates.dueDate = body.dueDate;
     }
 
     await db.todo.update(updates, {

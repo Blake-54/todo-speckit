@@ -1,7 +1,7 @@
 # API Reference
 
 **Base path:** `/todo/`  
-**Status:** Integrated API through **Feature 4** (user profile management).  
+**Status:** Integrated API through **Feature 5** (todo due dates).  
 **Authority for new work:** feature specs in `features/` — update this file in the same PR when routes or payloads change.
 
 **Auth:** Send `Authorization: Bearer <token>` on protected routes.  
@@ -15,6 +15,7 @@
 | List CRUD | 2 |
 | Todo items | 3 |
 | Profile read and update | 4 |
+| Todo due dates | 5 |
 
 ---
 
@@ -157,24 +158,31 @@ Deleting a list also deletes its todos.
 |--------|------|------|---------|
 | `GET` | `/todo/lists/:listId/todos` | Yes | Todos in a list owned by the caller |
 | `POST` | `/todo/lists/:listId/todos` | Yes | Add a todo to a list owned by the caller |
-| `PUT` | `/todo/todos/:id` | Yes | Update title and/or `completed` on a todo owned by the caller |
+| `PUT` | `/todo/todos/:id` | Yes | Update title, `completed`, and/or `dueDate` on a todo owned by the caller |
 | `DELETE` | `/todo/todos/:id` | Yes | Delete a todo owned by the caller |
 
 Todos are ordered incomplete first, then by `createdAt` ascending (`id` ascending breaks remaining ties).
 
 **Create body:**
 ```json
-{ "title": "Buy milk" }
+{
+  "title": "Buy milk",
+  "dueDate": "2026-07-15"
+}
 ```
 
-`userId`, `listId`, and `completed` in the body are ignored. The saved owner is the authenticated user, the list is the `:listId` path parameter, and `completed` is `false`.
+`dueDate` is optional. Omit it or send `null` for no due date. `userId`, `listId`, and `completed` in the body are ignored. The saved owner is the authenticated user, the list is the `:listId` path parameter, and `completed` is `false`.
 
-**Update body** (at least one field):
+**Update body** (at least one of `title`, `completed`, or `dueDate`):
 ```json
-{ "title": "Buy oat milk", "completed": true }
+{
+  "title": "Buy oat milk",
+  "completed": true,
+  "dueDate": "2026-07-20"
+}
 ```
 
-`userId` and `listId` in the body are ignored. A todo stays on the list and user it was created with.
+Clear a due date with `{ "dueDate": null }`. Omitting `dueDate` leaves the stored date unchanged. `userId` and `listId` in the body are ignored. A todo stays on the list and user it was created with.
 
 **Todo object** (`201` create · `200` update · each `GET` element):
 ```json
@@ -183,15 +191,18 @@ Todos are ordered incomplete first, then by `createdAt` ascending (`id` ascendin
   "listId": 1,
   "title": "Buy milk",
   "completed": false,
+  "dueDate": "2026-07-15",
   "userId": 42,
   "createdAt": "2026-07-02T12:05:00.000Z",
   "updatedAt": "2026-07-02T12:05:00.000Z"
 }
 ```
 
+`dueDate` is `null` when not set. Values are calendar dates (`YYYY-MM-DD`).
+
 **Delete success** (`200`):
 ```json
 { "message": "Todo deleted." }
 ```
 
-**Todo errors:** empty or whitespace-only title `400` (`"Todo title is required."`); title longer than 255 characters `400` (`"Todo title must be 255 characters or fewer."`); update body with neither `title` nor `completed` `400` (`"Todo title or completed status is required."`); `completed` present but not a boolean `400` (`"Completed must be true or false."`); invalid `listId` `400` (`"Invalid list id."`); invalid todo id `400` (`"Invalid todo id."`); missing or unowned parent list `404` (`"List with id=<id> not found."`); missing or unowned todo `404` (`"Todo with id=<id> not found."`); missing or invalid token `401`.
+**Todo errors:** empty or whitespace-only title `400` (`"Todo title is required."`); title longer than 255 characters `400` (`"Todo title must be 255 characters or fewer."`); update body with neither `title`, `completed`, nor `dueDate` `400` (`"Todo title or completed status is required."`); `completed` present but not a boolean `400` (`"Completed must be true or false."`); invalid `dueDate` `400` (`"Due date must be a valid date in YYYY-MM-DD format."`); invalid `listId` `400` (`"Invalid list id."`); invalid todo id `400` (`"Invalid todo id."`); missing or unowned parent list `404` (`"List with id=<id> not found."`); missing or unowned todo `404` (`"Todo with id=<id> not found."`); missing or invalid token `401`.

@@ -53,12 +53,15 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | List names are trimmed; empty or whitespace-only names are rejected | List create/rename + dashboard form | Feature 2 |
 | List names longer than 100 characters are rejected | List create/rename | Feature 2 |
 | A todo belongs to exactly one list and one user for its lifetime | Todo create sets `listId` from the path and `userId` from the session; update does not change either | Feature 3 |
-| `GET /todo/lists/:listId/todos` returns only the caller's todos for an owned list, incomplete first, then `createdAt` ascending | Todo read | Feature 3 |
+| `GET /todo/lists/:listId/todos` returns only the caller's todos for an owned list, incomplete first, then `createdAt` ascending (due date does not change sort) | Todo read | Feature 3, Feature 5 |
 | Create sets `userId` from the session and `listId` from `:listId`; body `userId`, `listId`, and `completed` are ignored | Todo create | Feature 3 |
 | New todos start `completed: false` | Todo create | Feature 3 |
 | Todo titles are trimmed; empty or whitespace-only titles are rejected | Todo create/update + items dialog forms | Feature 3 |
 | Todo titles longer than 255 characters are rejected | Todo create/update | Feature 3 |
 | Read, update, and delete apply only when the todo `id` and `userId` both match; a missing or unowned parent list or todo is `404` | `getAccessibleListOrNull`, `getAccessibleTodoOrNull` | Feature 3 |
+| `dueDate` is optional on create and update; `null` means no due date; values are `YYYY-MM-DD` | Todo API + add/edit item dialogs | Feature 5 |
+| `PUT` with `dueDate: null` clears the date; omitting `dueDate` leaves the stored date | Todo update | Feature 5 |
+| Invalid `dueDate` is rejected and does not create or change the todo | Todo create/update | Feature 5 |
 | Deleting a list deletes every todo in that list | List delete + `List hasMany Todo` `onDelete: CASCADE` | Feature 3 |
 | A user may read and update only their own profile; another user's id is `404` with `"User with id=<id> not found."` | `getAccessibleUserOrNull` | Feature 4 |
 
@@ -72,6 +75,8 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | **+ Add Item** is only inside the list-items dialog; it and **Add** use class `oc-cta` | `Dashboard.vue` | Feature 3 |
 | Empty todos copy is **No todos in this list yet.** | `Dashboard.vue` | Feature 3 |
 | Completed todos show struck-through, muted titles | `Dashboard.vue` | Feature 3 |
+| Add and edit item dialogs include an optional due date. The list row shows a formatted date when one is set | `Dashboard.vue` | Feature 5 |
+| An incomplete todo whose `dueDate` is before today in the browser's local calendar uses error color on the date. Completed todos do not | `isTodoOverdue` + `Dashboard.vue` | Feature 5 |
 | Empty lists copy is **No lists yet. Create your first list.** | `Dashboard.vue` | Feature 2 |
 | List and todo API failures use `<v-alert type="error">` | `Dashboard.vue` | Feature 2, Feature 3 |
 | `MenuBar` is hidden on login and register | `MenuBar.vue` + `App.vue` | Feature 2 |
@@ -93,6 +98,7 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Unowned or missing todo uses `404` with `"Todo with id=<id> not found."` | Todo update/delete | Feature 3 |
 | Invalid todo id uses `400` with `"Invalid todo id."` | Todo update/delete | Feature 3 |
 | Empty todo title uses `400` with `"Todo title is required."` | Todo create/update | Feature 3 |
+| Invalid due date uses `400` with `"Due date must be a valid date in YYYY-MM-DD format."` | Todo create/update | Feature 5 |
 | Missing or unowned profile uses `404` with `"User with id=<id> not found."` (never `403`) | Profile read/update | Feature 4 |
 | Invalid user id uses `400` with `"Invalid user id."` | Profile read/update | Feature 4 |
 | Profile password shorter than 8 characters uses `400` with `"Password must be at least 8 characters."` | Profile update | Feature 4 |
