@@ -1,7 +1,7 @@
 # API Reference
 
 **Base path:** `/todo/`  
-**Status:** Integrated API through **Feature 3** (todo list item management).  
+**Status:** Integrated API through **Feature 4** (user profile management).  
 **Authority for new work:** feature specs in `features/` — update this file in the same PR when routes or payloads change.
 
 **Auth:** Send `Authorization: Bearer <token>` on protected routes.  
@@ -14,6 +14,7 @@
 | Register, login, logout | 1 |
 | List CRUD | 2 |
 | Todo items | 3 |
+| Profile read and update | 4 |
 
 ---
 
@@ -67,6 +68,48 @@ Password hashes are never included in API responses.
 ```
 
 **Common auth errors:** missing fields `400`; password < 8 chars `400` (`"Password must be at least 8 characters."`); duplicate username `"Username is already taken."`; duplicate email `"Email is already registered."`; invalid login `401` with `"Invalid username or password."`; missing/invalid token on protected routes `401` (`"Unauthorized! No token provided."` or `"Unauthorized! Invalid or expired token."`).
+
+---
+
+## Profile (Feature 4)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/todo/users/:id` | Yes | Fetch the authenticated user's own profile |
+| `PUT` | `/todo/users/:id` | Yes | Update the authenticated user's own profile |
+
+Both routes succeed only when `:id` is the caller's user id. Another user's id returns `404`.
+
+**Update body:**
+```json
+{
+  "fName": "Jane",
+  "lName": "Doe",
+  "email": "jane@example.com",
+  "username": "jdoe",
+  "password": "newpassword123"
+}
+```
+
+`fName`, `lName`, `email`, and `username` are required. `password` is optional; omit it to leave the current password unchanged. `role` in the body is ignored. Fields are trimmed; `username` is stored lowercase.
+
+**Profile object** (`200` get · `200` update):
+```json
+{
+  "id": 42,
+  "fName": "Jane",
+  "lName": "Doe",
+  "email": "jane@example.com",
+  "username": "jdoe",
+  "role": "worker",
+  "createdAt": "2026-07-02T12:00:00.000Z",
+  "updatedAt": "2026-07-02T12:05:00.000Z"
+}
+```
+
+The password hash is never included.
+
+**Profile errors:** missing or blank first name `400` (`"First name is required."`); missing or blank last name `400` (`"Last name is required."`); missing or blank email `400` (`"Email is required."`); missing or blank username `400` (`"Username is required."`); password present and shorter than 8 characters `400` (`"Password must be at least 8 characters."`); duplicate username `400` (`"Username is already taken."`); duplicate email `400` (`"Email is already registered."`); invalid user id `400` (`"Invalid user id."`); missing or unowned user `404` (`"User with id=<id> not found."`); missing or invalid token `401`.
 
 ---
 

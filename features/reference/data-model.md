@@ -1,6 +1,6 @@
 # Data Model Reference
 
-**Status:** Integrated schema through **Feature 3** (`users`, `sessions`, `lists`, `todos`).  
+**Status:** Integrated schema through **Feature 4** (`users`, `sessions`, `lists`, `todos`). Feature 4 adds no tables or columns; it reads and updates `users`.  
 **Authority for new work:** feature specs in `features/` — update this file in the same PR when schema changes.  
 **Architecture:** [ADR-0003 — MySQL relational database](../../docs/adr/0003-mysql-relational-database.md)
 
@@ -11,6 +11,7 @@
 | `users`, `sessions` | Feature 1 |
 | `lists` | Feature 2 |
 | `todos` | Feature 3 |
+| Profile read/update of existing `users` columns | Feature 4 |
 
 ---
 
@@ -19,12 +20,12 @@
 | Column | Type | Rules |
 |--------|------|-------|
 | `id` | INTEGER PK | Auto-increment |
-| `fName` | STRING | Required |
-| `lName` | STRING | Required |
-| `email` | STRING | Required, unique |
-| `username` | STRING(100) | Required, unique; trimmed and stored lowercase (`beforeValidate` hook) |
-| `password` | STRING(255) | Required; bcrypt hash only (never returned by API) |
-| `role` | STRING(20) | Default `worker` |
+| `fName` | STRING | Required; trimmed on profile update |
+| `lName` | STRING | Required; trimmed on profile update |
+| `email` | STRING | Required, unique; trimmed on profile update |
+| `username` | STRING(100) | Required, unique; trimmed and stored lowercase (`beforeValidate` hook and profile update) |
+| `password` | STRING(255) | Required; bcrypt hash only (never returned by API). Profile update replaces the hash only when a new password is sent |
+| `role` | STRING(20) | Default `worker`; returned on profile read, not writable via profile update |
 | `createdAt` | DATE | Sequelize timestamps |
 | `updatedAt` | DATE | Sequelize timestamps |
 

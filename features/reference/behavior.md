@@ -33,8 +33,13 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Unauthenticated protected UI → redirect to login | Router `beforeEach` | Feature 1 |
 | Signed-in user visiting login/register → redirect to home | Router `beforeEach` | Feature 1 |
 | Default role for new users is `worker` | Register | Feature 1 |
-| Username normalized `trim().toLowerCase()` on save | User model hook + auth controller | Feature 1 |
-| Shared `emailRules` for registration (required + format `"Enter a valid email address."`) | `frontend/src/config/validation.js` | Feature 1 |
+| Username normalized `trim().toLowerCase()` on save | User model hook + auth controller + profile update | Feature 1, Feature 4 |
+| Shared `emailRules` for registration and Edit Profile (required + format `"Enter a valid email address."`) | `frontend/src/config/validation.js` | Feature 1, Feature 4 |
+| Profile update trims `fName`, `lName`, `email`, and `username`; blank required strings are rejected | Profile update | Feature 4 |
+| Profile password is optional; when sent it must be at least 8 characters and is bcrypt-hashed; when omitted the stored hash is unchanged | Profile update | Feature 4 |
+| Profile `role` is read-only | Profile update ignores `role` | Feature 4 |
+| Duplicate profile username → `"Username is already taken."`; duplicate email → `"Email is already registered."` | Profile update | Feature 4 |
+| After a successful profile save, `localStorage` key `user` is refreshed (session token kept) and `user-logged-in` is dispatched | Edit Profile dialog | Feature 4 |
 
 ## Ownership & isolation
 
@@ -55,6 +60,7 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Todo titles longer than 255 characters are rejected | Todo create/update | Feature 3 |
 | Read, update, and delete apply only when the todo `id` and `userId` both match; a missing or unowned parent list or todo is `404` | `getAccessibleListOrNull`, `getAccessibleTodoOrNull` | Feature 3 |
 | Deleting a list deletes every todo in that list | List delete + `List hasMany Todo` `onDelete: CASCADE` | Feature 3 |
+| A user may read and update only their own profile; another user's id is `404` with `"User with id=<id> not found."` | `getAccessibleUserOrNull` | Feature 4 |
 
 ## UI
 
@@ -68,7 +74,11 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Completed todos show struck-through, muted titles | `Dashboard.vue` | Feature 3 |
 | Empty lists copy is **No lists yet. Create your first list.** | `Dashboard.vue` | Feature 2 |
 | List and todo API failures use `<v-alert type="error">` | `Dashboard.vue` | Feature 2, Feature 3 |
-| `MenuBar` shows the signed-in user's name and **Sign out**, and is hidden on login and register | `MenuBar.vue` + `App.vue` | Feature 2 |
+| `MenuBar` is hidden on login and register | `MenuBar.vue` + `App.vue` | Feature 2 |
+| `MenuBar` shows a user icon (`mdi-account-circle`) that opens a profile dropdown with full name, username, email, **Edit Profile** (`oc-cta`), and **Log out** | `MenuBar.vue` | Feature 4 |
+| Logout is only **Log out** in the profile dropdown; the menu bar has no **Sign out** button | `MenuBar.vue` | Feature 4 |
+| **Log out** clears the server session, removes `localStorage` key `user`, and redirects to login | `authServices.logoutUser` | Feature 1, Feature 4 |
+| Edit Profile pre-fills name, email, and username; password fields start empty. Invalid email, a password shorter than 8 characters, and mismatched passwords are blocked in the form. API errors stay in an error alert with the dialog open | `MenuBar.vue` | Feature 4 |
 | Session stored in `localStorage` key `user` | `Utils.setStore` after login/register | Feature 1 |
 | Auth form errors via `<v-alert type="error">`; client validation blocks empty/invalid submit | Login/Register views | Feature 1 |
 
@@ -83,6 +93,10 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Unowned or missing todo uses `404` with `"Todo with id=<id> not found."` | Todo update/delete | Feature 3 |
 | Invalid todo id uses `400` with `"Invalid todo id."` | Todo update/delete | Feature 3 |
 | Empty todo title uses `400` with `"Todo title is required."` | Todo create/update | Feature 3 |
+| Missing or unowned profile uses `404` with `"User with id=<id> not found."` (never `403`) | Profile read/update | Feature 4 |
+| Invalid user id uses `400` with `"Invalid user id."` | Profile read/update | Feature 4 |
+| Profile password shorter than 8 characters uses `400` with `"Password must be at least 8 characters."` | Profile update | Feature 4 |
+| Blank profile first name uses `400` with `"First name is required."` | Profile update | Feature 4 |
 
 ---
 
