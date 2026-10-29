@@ -47,6 +47,14 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | A list's owner never changes after create | List update writes `name` only | Feature 2 |
 | List names are trimmed; empty or whitespace-only names are rejected | List create/rename + dashboard form | Feature 2 |
 | List names longer than 100 characters are rejected | List create/rename | Feature 2 |
+| A todo belongs to exactly one list and one user for its lifetime | Todo create sets `listId` from the path and `userId` from the session; update does not change either | Feature 3 |
+| `GET /todo/lists/:listId/todos` returns only the caller's todos for an owned list, incomplete first, then `createdAt` ascending | Todo read | Feature 3 |
+| Create sets `userId` from the session and `listId` from `:listId`; body `userId`, `listId`, and `completed` are ignored | Todo create | Feature 3 |
+| New todos start `completed: false` | Todo create | Feature 3 |
+| Todo titles are trimmed; empty or whitespace-only titles are rejected | Todo create/update + items dialog forms | Feature 3 |
+| Todo titles longer than 255 characters are rejected | Todo create/update | Feature 3 |
+| Read, update, and delete apply only when the todo `id` and `userId` both match; a missing or unowned parent list or todo is `404` | `getAccessibleListOrNull`, `getAccessibleTodoOrNull` | Feature 3 |
+| Deleting a list deletes every todo in that list | List delete + `List hasMany Todo` `onDelete: CASCADE` | Feature 3 |
 
 ## UI
 
@@ -54,8 +62,12 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 |------|-------------|------------|
 | Login and register are full-screen auth layouts (no `MenuBar`) | `App.vue` + Login/Register views | Feature 1 |
 | Signed-in home is one lists view: heading **My Lists**, **+ New List**, and edit/delete dialogs on each row | `Dashboard.vue` | Feature 2 |
+| Each list row has an **Items** icon that opens that list's items dialog; add, edit, and delete todos use dialogs opened from there | `Dashboard.vue` | Feature 3 |
+| **+ Add Item** is only inside the list-items dialog; it and **Add** use class `oc-cta` | `Dashboard.vue` | Feature 3 |
+| Empty todos copy is **No todos in this list yet.** | `Dashboard.vue` | Feature 3 |
+| Completed todos show struck-through, muted titles | `Dashboard.vue` | Feature 3 |
 | Empty lists copy is **No lists yet. Create your first list.** | `Dashboard.vue` | Feature 2 |
-| List API failures use `<v-alert type="error">` | `Dashboard.vue` | Feature 2 |
+| List and todo API failures use `<v-alert type="error">` | `Dashboard.vue` | Feature 2, Feature 3 |
 | `MenuBar` shows the signed-in user's name and **Sign out**, and is hidden on login and register | `MenuBar.vue` + `App.vue` | Feature 2 |
 | Session stored in `localStorage` key `user` | `Utils.setStore` after login/register | Feature 1 |
 | Auth form errors via `<v-alert type="error">`; client validation blocks empty/invalid submit | Login/Register views | Feature 1 |
@@ -66,8 +78,11 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 |------|-------------|------------|
 | Error body shape `{ "message": "Human-readable explanation." }` | Controllers | Feature 1 |
 | Missing/invalid session on protected routes uses `401` | `authenticate` | Feature 1 |
-| Unowned or missing list uses `404` with `"List with id=<id> not found."` | List update/delete | Feature 2 |
-| Invalid list id uses `400` with `"Invalid list id."` | List update/delete | Feature 2 |
+| Unowned or missing list uses `404` with `"List with id=<id> not found."` | List update/delete; todo read/create on that list | Feature 2, Feature 3 |
+| Invalid list id uses `400` with `"Invalid list id."` | List update/delete; todo read/create | Feature 2, Feature 3 |
+| Unowned or missing todo uses `404` with `"Todo with id=<id> not found."` | Todo update/delete | Feature 3 |
+| Invalid todo id uses `400` with `"Invalid todo id."` | Todo update/delete | Feature 3 |
+| Empty todo title uses `400` with `"Todo title is required."` | Todo create/update | Feature 3 |
 
 ---
 

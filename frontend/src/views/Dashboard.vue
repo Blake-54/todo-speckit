@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import todoServices from "../services/todoServices.js";
 
 const lists = ref([]);
@@ -24,7 +24,31 @@ const deleting = ref(false);
 
 const selectedList = ref(null);
 
+const itemsDialog = ref(false);
+const itemsList = ref(null);
+const todos = ref([]);
+const todosLoading = ref(false);
+const todoLoadError = ref("");
+
+const addItemDialog = ref(false);
+const newTodoTitle = ref("");
+const addTodoError = ref("");
+const addingTodo = ref(false);
+const addTodoForm = ref(null);
+
+const editItemDialog = ref(false);
+const editTodoTitle = ref("");
+const editTodoError = ref("");
+const editingTodo = ref(false);
+const editTodoForm = ref(null);
+
+const deleteItemDialog = ref(false);
+const deleteTodoError = ref("");
+const deletingTodo = ref(false);
+const selectedTodo = ref(null);
+
 const listNameRules = [(value) => !!value?.trim() || "List name is required."];
+const todoTitleRules = [(value) => !!value?.trim() || "Todo title is required."];
 
 const loadLists = async () => {
   loading.value = true;
@@ -118,6 +142,140 @@ const handleDelete = async () => {
   }
 };
 
+const loadTodos = async () => {
+  if (!itemsList.value) {
+    return;
+  }
+
+  todosLoading.value = true;
+  todoLoadError.value = "";
+
+  try {
+    const response = await todoServices.getTodos(itemsList.value.id);
+    todos.value = response.data;
+  } catch (error) {
+    todoLoadError.value = error.response?.data?.message || "Failed to load todos.";
+    todos.value = [];
+  } finally {
+    todosLoading.value = false;
+  }
+};
+
+const openItems = async (list) => {
+  itemsList.value = list;
+  todos.value = [];
+  todoLoadError.value = "";
+  addItemDialog.value = false;
+  editItemDialog.value = false;
+  deleteItemDialog.value = false;
+  todosLoading.value = true;
+  itemsDialog.value = true;
+  await loadTodos();
+};
+
+const closeItems = () => {
+  itemsDialog.value = false;
+};
+
+watch(itemsDialog, (open) => {
+  if (!open) {
+    addItemDialog.value = false;
+    editItemDialog.value = false;
+    deleteItemDialog.value = false;
+  }
+});
+
+const openAddItem = () => {
+  newTodoTitle.value = "";
+  addTodoError.value = "";
+  addItemDialog.value = true;
+};
+
+const handleAddTodo = async () => {
+  addTodoError.value = "";
+  const { valid } = await addTodoForm.value.validate();
+
+  if (!valid) {
+    return;
+  }
+
+  addingTodo.value = true;
+
+  try {
+    await todoServices.createTodo(itemsList.value.id, {
+      title: newTodoTitle.value.trim(),
+    });
+    addItemDialog.value = false;
+    await loadTodos();
+  } catch (error) {
+    addTodoError.value = error.response?.data?.message || "Failed to add todo.";
+  } finally {
+    addingTodo.value = false;
+  }
+};
+
+const openEditTodo = (todo) => {
+  selectedTodo.value = todo;
+  editTodoTitle.value = todo.title;
+  editTodoError.value = "";
+  editItemDialog.value = true;
+};
+
+const handleEditTodo = async () => {
+  editTodoError.value = "";
+  const { valid } = await editTodoForm.value.validate();
+
+  if (!valid) {
+    return;
+  }
+
+  editingTodo.value = true;
+
+  try {
+    await todoServices.updateTodo(selectedTodo.value.id, {
+      title: editTodoTitle.value.trim(),
+    });
+    editItemDialog.value = false;
+    await loadTodos();
+  } catch (error) {
+    editTodoError.value = error.response?.data?.message || "Failed to update todo.";
+  } finally {
+    editingTodo.value = false;
+  }
+};
+
+const openDeleteTodo = (todo) => {
+  selectedTodo.value = todo;
+  deleteTodoError.value = "";
+  deleteItemDialog.value = true;
+};
+
+const handleDeleteTodo = async () => {
+  deleteTodoError.value = "";
+  deletingTodo.value = true;
+
+  try {
+    await todoServices.deleteTodo(selectedTodo.value.id);
+    deleteItemDialog.value = false;
+    await loadTodos();
+  } catch (error) {
+    deleteTodoError.value = error.response?.data?.message || "Failed to delete todo.";
+  } finally {
+    deletingTodo.value = false;
+  }
+};
+
+const handleToggleTodo = async (todo, completed) => {
+  todoLoadError.value = "";
+
+  try {
+    await todoServices.updateTodo(todo.id, { completed: completed === true });
+    await loadTodos();
+  } catch (error) {
+    todoLoadError.value = error.response?.data?.message || "Failed to update todo.";
+  }
+};
+
 onMounted(loadLists);
 </script>
 
@@ -163,6 +321,15 @@ onMounted(loadLists);
             :title="list.name"
           >
             <template #append>
+              <v-btn
+                icon
+                size="small"
+                variant="text"
+                :aria-label="`View items for ${list.name}`"
+                @click="openItems(list)"
+              >
+                <v-icon icon="mdi-format-list-bulleted" />
+              </v-btn>
               <v-btn
                 icon
                 size="small"
@@ -297,6 +464,212 @@ onMounted(loadLists);
               class="oc-cta"
               :loading="deleting"
               @click="handleDelete"
+            >
+              Delete
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-if="itemsDialog" v-model="itemsDialog" max-width="640">
+      <v-card>
+        <v-card-item>
+          <template #title>
+            {{ itemsList?.name }} — Items
+          </template>
+          <template #append>
+            <v-btn
+              color="primary"
+              variant="elevated"
+              class="oc-cta"
+              @click="openAddItem"
+            >
+              + Add Item
+            </v-btn>
+          </template>
+        </v-card-item>
+
+        <v-card-text>
+          <v-progress-linear
+            v-if="todosLoading"
+            indeterminate
+            color="primary"
+            class="todos-loading mb-4"
+          />
+
+          <v-alert v-if="todoLoadError" type="error" class="mb-4">
+            {{ todoLoadError }}
+          </v-alert>
+
+          <p v-if="!todosLoading && !todoLoadError && todos.length === 0">
+            No todos in this list yet.
+          </p>
+
+          <v-list v-else-if="!todosLoading && todos.length > 0" lines="one">
+            <v-list-item v-for="todo in todos" :key="todo.id">
+              <template #prepend>
+                <v-checkbox
+                  :model-value="todo.completed"
+                  color="primary"
+                  hide-details
+                  density="compact"
+                  :aria-label="`Complete ${todo.title}`"
+                  @update:model-value="(value) => handleToggleTodo(todo, value)"
+                />
+              </template>
+              <template #title>
+                <span
+                  :class="{
+                    'text-decoration-line-through text-medium-emphasis': todo.completed,
+                  }"
+                >
+                  {{ todo.title }}
+                </span>
+              </template>
+              <template #append>
+                <v-btn
+                  icon
+                  size="small"
+                  variant="text"
+                  :aria-label="`Edit ${todo.title}`"
+                  @click="openEditTodo(todo)"
+                >
+                  <v-icon icon="mdi-pencil" />
+                </v-btn>
+                <v-btn
+                  icon
+                  size="small"
+                  variant="text"
+                  :aria-label="`Delete ${todo.title}`"
+                  @click="openDeleteTodo(todo)"
+                >
+                  <v-icon icon="mdi-delete" />
+                </v-btn>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="secondary" variant="text" @click="closeItems">
+            Close
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-if="addItemDialog" v-model="addItemDialog" max-width="480">
+      <v-card>
+        <v-card-item>
+          <v-card-title>Add item</v-card-title>
+        </v-card-item>
+        <v-card-text>
+          <v-form ref="addTodoForm" @submit.prevent="handleAddTodo">
+            <v-text-field
+              v-model="newTodoTitle"
+              label="Todo title"
+              :rules="todoTitleRules"
+              class="mb-2"
+            />
+
+            <v-alert v-if="addTodoError" type="error" class="mb-4">
+              {{ addTodoError }}
+            </v-alert>
+
+            <div class="d-flex justify-end ga-2">
+              <v-btn
+                color="secondary"
+                variant="text"
+                type="button"
+                @click="addItemDialog = false"
+              >
+                Cancel
+              </v-btn>
+              <v-btn
+                color="primary"
+                variant="elevated"
+                class="oc-cta"
+                type="submit"
+                :loading="addingTodo"
+              >
+                Add
+              </v-btn>
+            </div>
+          </v-form>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-if="editItemDialog" v-model="editItemDialog" max-width="480">
+      <v-card>
+        <v-card-item>
+          <v-card-title>Edit item</v-card-title>
+        </v-card-item>
+        <v-card-text>
+          <v-form ref="editTodoForm" @submit.prevent="handleEditTodo">
+            <v-text-field
+              v-model="editTodoTitle"
+              label="Todo title"
+              :rules="todoTitleRules"
+              class="mb-2"
+            />
+
+            <v-alert v-if="editTodoError" type="error" class="mb-4">
+              {{ editTodoError }}
+            </v-alert>
+
+            <div class="d-flex justify-end ga-2">
+              <v-btn
+                color="secondary"
+                variant="text"
+                type="button"
+                @click="editItemDialog = false"
+              >
+                Cancel
+              </v-btn>
+              <v-btn
+                color="primary"
+                variant="elevated"
+                class="oc-cta"
+                type="submit"
+                :loading="editingTodo"
+              >
+                Save
+              </v-btn>
+            </div>
+          </v-form>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-if="deleteItemDialog" v-model="deleteItemDialog" max-width="480">
+      <v-card>
+        <v-card-item>
+          <v-card-title>Delete item</v-card-title>
+        </v-card-item>
+        <v-card-text>
+          <p class="mb-4">Delete {{ selectedTodo?.title }}?</p>
+
+          <v-alert v-if="deleteTodoError" type="error" class="mb-4">
+            {{ deleteTodoError }}
+          </v-alert>
+
+          <div class="d-flex justify-end ga-2">
+            <v-btn
+              color="secondary"
+              variant="text"
+              @click="deleteItemDialog = false"
+            >
+              Cancel
+            </v-btn>
+            <v-btn
+              color="primary"
+              variant="elevated"
+              class="oc-cta"
+              :loading="deletingTodo"
+              @click="handleDeleteTodo"
             >
               Delete
             </v-btn>
